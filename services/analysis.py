@@ -6,7 +6,7 @@ print("Loading text analysis models...")
 try:
     emotion_pipeline = pipeline(
         "text-classification", 
-        model="mrm8488/distilroberta-tiny-finetuned-go_emotions",
+        model="joeddav/distilbert-base-uncased-go-emotions-student",
         top_k=3
     )
     
