@@ -1,0 +1,10 @@
+fastapi
+uvicorn[standard]
+python-dotenv
+pydantic-settings
+transformers
+torch
+keybert
+sentence-transformers
+google-api-python-client
+gunicorn

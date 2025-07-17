@@ -1,0 +1,206 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mindful Recommender</title>
+
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Google Fonts: Inter -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+  
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        .fade-in {
+            animation: fadeIn 0.5s ease-out forwards;
+        }
+    </style>
+</head>
+<body class="bg-slate-50 text-slate-800 antialiased">
+
+    <div class="container mx-auto max-w-2xl px-4 py-8 md:py-16">
+
+
+        <header class="text-center mb-8">
+            <h1 class="text-3xl md:text-4xl font-bold text-slate-900">Mindful Recommender</h1>
+            <p class="mt-2 text-lg text-slate-600">Describe how you're feeling, and we'll find videos to help.</p>
+        </header>
+
+
+        <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
+            <label for="userInput" class="block text-sm font-medium text-slate-700 mb-2">How are you feeling right now?</label>
+            <textarea id="userInput" rows="4" class="w-full p-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-sky-500 focus:border-sky-500 transition duration-150" placeholder="e.g., I feel anxious and lazy when I am about to study..."></textarea>
+            <button id="submitBtn" class="mt-4 w-full bg-sky-600 text-white font-semibold py-3 px-4 rounded-lg hover:bg-sky-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-sky-500 transition-transform transform active:scale-[0.98]">
+                Get Recommendations
+            </button>
+        </div>
+
+        <div id="results" class="mt-10">
+
+            <div id="loading" class="hidden text-center">
+                <div class="flex justify-center items-center">
+                    <svg class="animate-spin -ml-1 mr-3 h-6 w-6 text-sky-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                    <span class="text-slate-600">Analyzing your feelings and finding videos...</span>
+                </div>
+            </div>
+
+
+            <div id="error" class="hidden bg-red-100 border border-red-300 text-red-800 px-4 py-3 rounded-lg text-center"></div>
+
+
+            <div id="analysis-results"></div>
+        </div>
+        
+    </div>
+
+    <script>
+
+        const submitBtn = document.getElementById('submitBtn');
+        const userInput = document.getElementById('userInput');
+        const resultsDiv = document.getElementById('results');
+        const loadingDiv = document.getElementById('loading');
+        const errorDiv = document.getElementById('error');
+        const analysisResultsDiv = document.getElementById('analysis-results');
+
+        const API_URL = 'http://127.0.0.1:8000/analyze-and-recommend';
+
+   
+        submitBtn.addEventListener('click', handleSubmission);
+
+        async function handleSubmission() {
+            const text = userInput.value.trim();
+
+            if (!text) {
+                showError('Please enter how you are feeling.');
+                return;
+            }
+
+      
+            resetUI();
+            loadingDiv.classList.remove('hidden');
+
+            try {
+           
+                const response = await fetch(API_URL, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Accept': 'application/json'
+                    },
+                    body: JSON.stringify({ text: text })
+                });
+
+                loadingDiv.classList.add('hidden');
+
+                if (!response.ok) {
+                
+                    throw new Error(`Server responded with status: ${response.status}`);
+                }
+
+                const data = await response.json();
+                
+            
+                displayResults(data);
+
+            } catch (error) {
+            
+                console.error('Error fetching recommendations:', error);
+                loadingDiv.classList.add('hidden');
+                showError('Could not connect to the server. Please make sure the backend is running.');
+            }
+        }
+
+        function displayResults(data) {
+        
+            analysisResultsDiv.innerHTML = '';
+
+        
+            const analysisHeader = document.createElement('div');
+            analysisHeader.className = 'mb-8 text-center fade-in';
+            analysisHeader.innerHTML = `
+                <h2 class="text-2xl font-bold text-slate-800">Analysis Complete</h2>
+                <p class="text-slate-600 mt-1">
+                    We've identified the core emotion as <strong class="text-sky-600">${data.core_emotion}</strong>
+                    ${data.core_keywords.length > 0 ? `with key concerns around <strong class="text-sky-600">${data.core_keywords.join(', ')}</strong>.` : '.'}
+                </p>
+            `;
+            analysisResultsDiv.appendChild(analysisHeader);
+
+        
+            Object.keys(data.recommendations).forEach((topic, index) => {
+                const videos = data.recommendations[topic];
+                if (videos.length === 0) return;
+
+                const topicSection = document.createElement('div');
+                topicSection.className = 'mb-6 fade-in';
+                topicSection.style.animationDelay = `${index * 100}ms`;
+                
+                topicSection.innerHTML = `
+                    <h3 class="text-xl font-semibold text-slate-700 mb-3">Recommendations for: <span class="capitalize text-sky-700">${topic}</span></h3>
+                    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                        ${videos.map(video => createVideoCard(video)).join('')}
+                    </div>
+                `;
+                analysisResultsDiv.appendChild(topicSection);
+            });
+        }
+
+        function createVideoCard(video) {
+        
+            const videoId = new URL(video.url).searchParams.get('v');
+            const thumbnailUrl = `https://i.ytimg.com/vi/${videoId}/mqdefault.jpg`;
+
+            return `
+                <a href="${video.url}" target="_blank" rel="noopener noreferrer" class="group block bg-white rounded-lg border border-slate-200 hover:shadow-lg hover:-translate-y-1 transition-all duration-300 overflow-hidden">
+                    <div class="relative">
+                        <img src="${thumbnailUrl}" alt="Video thumbnail" class="w-full h-auto object-cover" onerror="this.style.display='none'">
+                        <div class="absolute inset-0 bg-black bg-opacity-20 group-hover:bg-opacity-10 transition-all duration-300 flex items-center justify-center">
+                           <svg xmlns="http://www.w3.org/2000/svg" class="h-12 w-12 text-white opacity-80" viewBox="0 0 20 20" fill="currentColor">
+                              <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM9.555 7.168A1 1 0 008 8v4a1 1 0 001.555.832l3-2a1 1 0 000-1.664l-3-2z" clip-rule="evenodd" />
+                           </svg>
+                        </div>
+                    </div>
+                    <div class="p-4">
+                        <h4 class="font-semibold text-slate-800 leading-tight group-hover:text-sky-600 transition-colors duration-300">${escapeHTML(video.title)}</h4>
+                    </div>
+                </a>
+            `;
+        }
+
+        function showError(message) {
+            errorDiv.textContent = message;
+            errorDiv.classList.remove('hidden');
+        }
+
+        function resetUI() {
+            errorDiv.classList.add('hidden');
+            analysisResultsDiv.innerHTML = '';
+        }
+
+        function escapeHTML(str) {
+        
+            return str.replace(/[&<>'"]/g, 
+                tag => ({
+                    '&': '&amp;',
+                    '<': '&lt;',
+                    '>': '&gt;',
+                    "'": '&#39;',
+                    '"': '&quot;'
+                }[tag] || tag)
+            );
+        }
+
+    </script>
+</body>
+</html>
